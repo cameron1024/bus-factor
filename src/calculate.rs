@@ -16,6 +16,7 @@ pub async fn calculate<C: GithubClient, W: Write, Q: Into<Query> + Send>(
     query: Q,
 ) -> Result<(), Error> {
     let repos = client.list_repositories(query).await?;
+    info!("found {} matching repositories", repos.len());
     let summary_futures = repos
         .into_iter()
         .map(|repo| process_repo(client.clone(), repo));
@@ -34,7 +35,7 @@ async fn process_repo<C: GithubClient>(
 }
 
 /// summarize the repo, calculating the ratio from the lead contributor
-pub fn summarize(
+fn summarize(
     repo_name: String,
     contributors: impl IntoIterator<Item = Contributor>,
 ) -> RepositorySummary {
@@ -68,26 +69,53 @@ fn format_results(
     mut output: impl Write,
     results: impl IntoIterator<Item = RepositorySummary>,
 ) -> Result<(), Error> {
-    for RepositorySummary {
-        repo_name,
-        lead_contributor,
-        percentage,
-    } in results
-    {
-        writeln!(
-            output,
-            "project: {}\tuser: {}\tpercentage: {:.2}",
-            repo_name, lead_contributor, percentage
-        )?;
+    writeln!(output, "{0: <20} | {1: <20} | {2: <20}", "project", "user", "percentage")?;
+    writeln!(output, "{}", "-".repeat(60))?;
+    for repo in results {
+        if is_bus_factor_1(&repo) {
+            let RepositorySummary {
+                repo_name,
+                lead_contributor,
+                percentage,
+            } = repo;
+            writeln!(
+                output,
+                "{0: <20} | {1: <20} | {2:.2}",
+                repo_name, lead_contributor, percentage
+            )?;
+        }
     }
 
     Ok(())
 }
 
+fn is_bus_factor_1(repo: &RepositorySummary) -> bool {
+    repo.percentage >= 0.75
+}
+
 #[cfg(test)]
 mod tests {
 
-    use super::*;
+    use super::*;            
+
+    #[test]
+    fn identifies_bus_factor_1_repos() {
+        assert!(is_bus_factor_1(&RepositorySummary {
+            repo_name: "name".into(),
+            lead_contributor: "name".into(),
+            percentage: 0.75
+        }));
+        assert!(is_bus_factor_1(&RepositorySummary {
+            repo_name: "name".into(),
+            lead_contributor: "name".into(),
+            percentage: 0.9
+        }));
+        assert!(!is_bus_factor_1(&RepositorySummary {
+            repo_name: "name".into(),
+            lead_contributor: "name".into(),
+            percentage: 0.6
+        }));
+    }
 
     #[test]
     fn writes_to_output_in_correct_format() {
@@ -102,13 +130,51 @@ mod tests {
         )
         .unwrap();
         let string = String::from_utf8(output).unwrap();
-        assert_eq!(
-            string,
-            "project: ripgrep\tuser: burntsushi\tpercentage: 0.89\n"
-        );
+        let line = string.lines().skip(2).next().unwrap();  // skip 2 lines of header
+        assert!(line.contains("ripgrep"));
+        assert!(line.contains("burntsushi"));
+        assert!(line.contains("0.89"));
+    }
+
+    #[test]
+    fn format_results_ignores_non_bus_factor_1() {
+        let summary = RepositorySummary {
+            repo_name: "".into(),
+            lead_contributor: "".into(),
+            percentage: 0.74,
+        };
+
+        let mut output = vec![];
+        format_results(&mut output, [summary]).unwrap();
+        assert!(output.is_empty());
+    }
+
+    fn make_contributors(contributions: impl IntoIterator<Item = u64>) -> Vec<Contributor> {
+        let mut v = vec![];
+        for (index, number) in contributions.into_iter().enumerate() {
+            v.push(Contributor {
+                login: format!("user{}", index),
+                contributions: number,
+            });
+        }
+        v
     }
 
     #[test]
     fn correctly_summarizes_repos() {
+        let name = "repo name".to_string();
+        let contributors = make_contributors([1, 2, 3]);
+        let summary = summarize(name, contributors);
+        assert_eq!(summary, RepositorySummary {
+            repo_name: "repo name".to_string(),
+            lead_contributor: "user2".to_string(),
+            percentage: 0.5,
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn should_panic_when_no_contributors() {
+        summarize("".into(), make_contributors([]));
     }
 }

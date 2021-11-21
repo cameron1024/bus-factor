@@ -11,11 +11,13 @@ pub const KEY_FILE_PATH: &str = ".bus_factor_auth";
 
 pub fn get_api_key() -> Result<ApiKey, Error> {
     if let Some(key) = api_key_from_env() {
+        info!("using API key from env var");
         Ok(key)
     } else if let Some(key) = api_key_from_file() {
+        info!("using API key from file");
         Ok(key)
     } else {
-        Err(Error::MissingAuth)
+        bail!(crate::errors::ErrorKind::MissingAuth)
     }
 }
 

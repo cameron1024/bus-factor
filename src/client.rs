@@ -9,7 +9,7 @@ use secrecy::ExposeSecret;
 use crate::{errors::Error, model::*};
 
 #[async_trait]
-pub trait GithubClient : Clone{
+pub trait GithubClient: Clone {
     async fn list_repositories<Q: Into<Query> + Send>(
         &self,
         query: Q,
@@ -27,12 +27,12 @@ const REPO_SEARCH_URL: &str = "https://api.github.com/search/repositories";
 const V3_API_STR: &str = "application/vnd.github.v3+json";
 
 impl DefaultClient {
-
     pub fn create(api_key: ApiKey) -> Self {
         Self { api_key }
     }
 
     fn build_default_request(&self, s: impl AsRef<str>) -> RequestBuilder {
+        debug!("creating request builder for url: {}", s.as_ref());
         let auth = format!("token {}", self.api_key.expose_secret());
 
         reqwest::Client::new()
@@ -42,11 +42,16 @@ impl DefaultClient {
             .header(AUTHORIZATION, auth)
     }
 
-    fn make_repo_query(query: Query) -> HashMap<String, String> {
-        let query_string = format!("language:{}", query.language);
+    fn make_repo_query_params(query: Query) -> HashMap<&'static str, String> {
+        let query_string = format!("language:{} sort:stars", query.language);
         let mut map = HashMap::with_capacity(1);
-        map.insert("q".into(), query_string);
+        map.insert("q", query_string);
+        map.insert("per_page", query.limit.to_string());
         map
+    }
+
+    fn get_contributors_url(repo: &Repository) -> String {
+        format!("https://api.github.com/repos/{}/{}/contributors", repo.owner.login, repo.name)
     }
 }
 
@@ -61,7 +66,7 @@ impl GithubClient for DefaultClient {
             items: Vec<Repository>,
         }
 
-        let query = Self::make_repo_query(query.into());
+        let query = Self::make_repo_query_params(query.into());
         let response: Response = self
             .build_default_request(REPO_SEARCH_URL)
             .query(&query)
@@ -74,12 +79,42 @@ impl GithubClient for DefaultClient {
     }
 
     async fn list_contributors(&self, repository: &Repository) -> Result<Vec<Contributor>, Error> {
+        let url = Self::get_contributors_url(repository);
         let response = self
-            .build_default_request(&repository.collaborators_url)
+            .build_default_request(url)
             .send()
             .await?
             .json()
             .await?;
         Ok(response)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn correctly_generates_contributors_url() {
+        let repo = Repository {
+            owner: Owner {
+                login: "owner".into(),
+            },
+            name: "repo".into(),
+        };
+
+        let url = DefaultClient::get_contributors_url(&repo);
+        assert_eq!(url, "https://api.github.com/repos/owner/repo/contributors");
+    }
+
+    #[test]
+    fn correct_query_params() {
+        let query = Query {
+            limit: 20,
+            language: "rust".into(),
+        };
+        let map = DefaultClient::make_repo_query_params(query);
+        assert_eq!(map.get("q"), Some(&"language:rust sort:stars".to_string()));
+        assert_eq!(map.get("per_page"), Some(&"20".to_string()));
     }
 }
