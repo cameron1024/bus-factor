@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
   
     env:
+      RUST_LOG: debug
       BUS_FACTOR_AUTH: ${{ secrets.BUS_DRIVER_AUTH }}
 
     steps:
