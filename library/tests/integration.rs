@@ -76,8 +76,9 @@ impl GithubClient for MockClient {
 }
 
 // note, this test may be flaky, since it relies on the internet, and could be invalidated if the
-// real-world data changes
+// real-world data changes, this is more for demonstration purposes, so is excluded from CI
 #[tokio::test]
+#[cfg_attr(not(e2e), ignore)]
 async fn live_example() {
     let query = Query {
         language: "rust".into(),

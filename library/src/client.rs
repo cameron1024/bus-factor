@@ -90,8 +90,6 @@ impl GithubClient for DefaultClient {
 
 #[cfg(test)]
 mod tests {
-    use microtype::SecretMicrotype;
-
     use super::*;
 
     #[test]
