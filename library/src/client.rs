@@ -51,7 +51,10 @@ impl DefaultClient {
     }
 
     fn get_contributors_url(repo: &Repository) -> String {
-        format!("https://api.github.com/repos/{}/{}/contributors", repo.owner.login, repo.name)
+        format!(
+            "https://api.github.com/repos/{}/{}/contributors",
+            repo.owner.login, repo.name
+        )
     }
 }
 
@@ -80,18 +83,15 @@ impl GithubClient for DefaultClient {
 
     async fn list_contributors(&self, repository: &Repository) -> Result<Vec<Contributor>, Error> {
         let url = Self::get_contributors_url(repository);
-        let response = self
-            .build_default_request(url)
-            .send()
-            .await?
-            .json()
-            .await?;
+        let response = self.build_default_request(url).send().await?.json().await?;
         Ok(response)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use microtype::SecretMicrotype;
+
     use super::*;
 
     #[test]
@@ -100,11 +100,11 @@ mod tests {
             owner: Owner {
                 login: "owner".into(),
             },
-            name: "repo".into(),
+            name: "repo_name".into(),
         };
 
         let url = DefaultClient::get_contributors_url(&repo);
-        assert_eq!(url, "https://api.github.com/repos/owner/repo/contributors");
+        assert_eq!(url, "https://api.github.com/repos/owner/repo_name/contributors");
     }
 
     #[test]

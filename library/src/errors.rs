@@ -1,6 +1,5 @@
 use reqwest::header::InvalidHeaderValue;
 
-
 error_chain! {
 
     foreign_links {
@@ -15,4 +14,3 @@ error_chain! {
         }
     }
 }
-

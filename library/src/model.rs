@@ -2,13 +2,13 @@ use microtype::SecretMicrotype;
 
 secret_microtype!(String => ApiKey);
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct Repository {
     pub name: String,
     pub owner: Owner,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 pub struct Owner {
     pub login: String,
 }
@@ -25,7 +25,6 @@ pub struct RepositorySummary {
     pub lead_contributor: String,
     pub percentage: f64,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Query {
@@ -49,16 +48,26 @@ mod tests {
 
     #[test]
     fn deserialize_test() {
-        let repo: Repository = from_str(r#"{"name": "name", "owner": {"login": "owner"}}"#).unwrap();
-        assert_eq!(repo, Repository {
-            name: "name".into(),
-            owner: Owner { login: "owner".into() }
-        });
+        let repo: Repository =
+            from_str(r#"{"name": "name", "owner": {"login": "owner"}}"#).unwrap();
+        assert_eq!(
+            repo,
+            Repository {
+                name: "name".into(),
+                owner: Owner {
+                    login: "owner".into()
+                }
+            }
+        );
 
-        let contributor: Contributor = from_str(r#"{"login": "login", "contributions": 53}"#).unwrap();
-        assert_eq!(contributor, Contributor {
-            login: "login".into(),
-            contributions: 53,
-        });
+        let contributor: Contributor =
+            from_str(r#"{"login": "login", "contributions": 53}"#).unwrap();
+        assert_eq!(
+            contributor,
+            Contributor {
+                login: "login".into(),
+                contributions: 53,
+            }
+        );
     }
 }

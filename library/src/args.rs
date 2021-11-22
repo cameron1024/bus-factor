@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::model::Query;
 
 #[derive(StructOpt, Debug, Clone, PartialEq, Eq)]
@@ -8,14 +10,23 @@ pub struct Args {
 
     #[structopt(long)]
     language: String,
+
+    #[structopt(long = "key_file")]  // for consistency
+    pub key_file: Option<PathBuf>,
 }
 
 impl From<Args> for Query {
-    fn from(Args { project_count, language }: Args) -> Self {
+    fn from(
+        Args {
+            project_count,
+            language,
+            key_file: _,
+        }: Args,
+    ) -> Self {
         Self {
             limit: project_count,
             language,
-        } 
+        }
     }
 }
 
@@ -34,6 +45,19 @@ mod tests {
             Args {
                 project_count: 10,
                 language: "rust".to_string(),
+                key_file: None,
+            }
+        );
+    }
+
+    #[test]
+    fn correct_usage_with_key_file() {
+        assert_eq!(
+            Args::from_iter(["bus-factor", "--project_count", "10", "--language", "rust", "--key_file", "/path/to/file"]),
+            Args {
+                project_count: 10,
+                language: "rust".to_string(),
+                key_file: Some("/path/to/file".into()),
             }
         );
     }
@@ -67,12 +91,14 @@ mod tests {
 
     #[test]
     fn can_convert_to_query() {
-        let args = 
-            Args::from_iter(["bus-factor", "--project_count", "10", "--language", "rust"]);
+        let args = Args::from_iter(["bus-factor", "--project_count", "10", "--language", "rust"]);
         let query: Query = args.into();
-        assert_eq!(query, Query {
-            language: "rust".into(),
-            limit: 10,
-        });
+        assert_eq!(
+            query,
+            Query {
+                language: "rust".into(),
+                limit: 10,
+            }
+        );
     }
 }

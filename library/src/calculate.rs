@@ -1,6 +1,6 @@
 use crate::{
+    client::GithubClient,
     model::{Contributor, Repository},
-    GithubClient,
 };
 use std::io::Write;
 
@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// execute a full query, writing a sumamry to the output provided
-pub async fn calculate<C: GithubClient, W: Write, Q: Into<Query> + Send>(
+pub async fn execute_query<C: GithubClient, W: Write, Q: Into<Query> + Send>(
     client: C,
     output: W,
     query: Q,
@@ -69,7 +69,11 @@ fn format_results(
     mut output: impl Write,
     results: impl IntoIterator<Item = RepositorySummary>,
 ) -> Result<(), Error> {
-    writeln!(output, "{0: <20} | {1: <20} | {2: <20}", "project", "user", "percentage")?;
+    writeln!(
+        output,
+        "{0: <20} | {1: <20} | {2: <20}",
+        "project", "user", "percentage"
+    )?;
     writeln!(output, "{}", "-".repeat(60))?;
     for repo in results {
         if is_bus_factor_1(&repo) {
@@ -96,7 +100,7 @@ fn is_bus_factor_1(repo: &RepositorySummary) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use super::*;            
+    use super::*;
 
     #[test]
     fn identifies_bus_factor_1_repos() {
@@ -130,7 +134,7 @@ mod tests {
         )
         .unwrap();
         let string = String::from_utf8(output).unwrap();
-        let line = string.lines().skip(2).next().unwrap();  // skip 2 lines of header
+        let line = string.lines().skip(2).next().unwrap(); // skip 2 lines of header
         assert!(line.contains("ripgrep"));
         assert!(line.contains("burntsushi"));
         assert!(line.contains("0.89"));
@@ -146,7 +150,29 @@ mod tests {
 
         let mut output = vec![];
         format_results(&mut output, [summary]).unwrap();
-        assert!(output.is_empty());
+        let s = String::from_utf8(output).unwrap();
+        assert_eq!(s.lines().collect::<Vec<_>>().len(), 2);  // 2 lines from header, rest should be empty
+    }
+
+    #[test]
+    fn format_results_ignores_non_bus_factor_1_multiple_items() {
+        let ignored_summary = RepositorySummary {
+            repo_name: "".into(),
+            lead_contributor: "".into(),
+            percentage: 0.74,
+        };
+        let printed_sumamry = RepositorySummary {
+            repo_name: "repo".into(),
+            lead_contributor: "contributor".into(),
+            percentage: 0.76,
+        };
+        let mut both = vec![];
+        let mut only_last = vec![];
+
+        format_results(&mut both, [ignored_summary.clone(), printed_sumamry.clone()]).unwrap();
+        format_results(&mut only_last, [printed_sumamry]).unwrap();
+
+        assert_eq!(both, only_last);
     }
 
     fn make_contributors(contributions: impl IntoIterator<Item = u64>) -> Vec<Contributor> {
@@ -165,11 +191,14 @@ mod tests {
         let name = "repo name".to_string();
         let contributors = make_contributors([1, 2, 3]);
         let summary = summarize(name, contributors);
-        assert_eq!(summary, RepositorySummary {
-            repo_name: "repo name".to_string(),
-            lead_contributor: "user2".to_string(),
-            percentage: 0.5,
-        });
+        assert_eq!(
+            summary,
+            RepositorySummary {
+                repo_name: "repo name".to_string(),
+                lead_contributor: "user2".to_string(),
+                percentage: 0.5,
+            }
+        );
     }
 
     #[test]
