@@ -2,8 +2,16 @@ use std::collections::HashMap;
 
 use library::prelude::*;
 
+fn expected_output_header() -> String {
+    let expected_output = format!(
+        "{0: <20} | {1: <20} | {2: <20}\n",
+        "project", "user", "percentage"
+    );
+    format!("{}{}\n", expected_output, "-".repeat(60))
+}
+
 #[tokio::test]
-async fn working_example() {
+async fn mocked_example() {
     let repos = vec![Repository {
         name: "repo1".into(),
         owner: Owner {
@@ -42,12 +50,7 @@ async fn working_example() {
     .unwrap();
 
     let actual_output = String::from_utf8(output).unwrap();
-
-    let expected_output = format!(
-        "{0: <20} | {1: <20} | {2: <20}\n",
-        "project", "user", "percentage"
-    );
-    let expected_output = format!("{}{}\n", expected_output, "-".repeat(60));
+    let expected_output = expected_output_header();
     let expected_output = format!(
         "{}{1: <20} | {2: <20} | {3:.2}\n",
         expected_output, "repo1", "user2", 0.9
@@ -71,3 +74,30 @@ impl GithubClient for MockClient {
         Ok(self.contributors.get(&repository.name).unwrap().clone())
     }
 }
+
+// note, this test may be flaky, since it relies on the internet, and could be invalidated if the
+// real-world data changes
+#[tokio::test]
+async fn live_example() {
+    let query = Query {
+        language: "rust".into(),
+        limit: 5,
+    };
+    let mut output = vec![];
+    let api_key = get_api_key(&None).unwrap();
+    let client = DefaultClient::create(api_key);
+    execute_query(client, &mut output, query).await.unwrap();
+
+    let expected_output = expected_output_header();
+    let expected_output = format!(
+        "{}{1: <20} | {2: <20} | {3:.2}\n",
+        expected_output, "996.ICU", "996icu", 0.78
+    );
+    let expected_output = format!(
+        "{}{1: <20} | {2: <20} | {3:.2}\n",
+        expected_output, "ripgrep", "BurntSushu", 0.88
+    );
+
+    assert_eq!(String::from_utf8(output).unwrap(), expected_output);
+}
+
