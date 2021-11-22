@@ -77,6 +77,10 @@ impl GithubClient for MockClient {
 
 // note, this test may be flaky, since it relies on the internet, and could be invalidated if the
 // real-world data changes, this is more for demonstration purposes, so is excluded from CI
+// 
+// to run this test, pass the environment variable:
+// RUSTFLAGS="--cfg e2e"
+// as well as passing the github API key via env var
 #[tokio::test]
 #[cfg_attr(not(e2e), ignore)]
 async fn live_example() {
@@ -96,7 +100,7 @@ async fn live_example() {
     );
     let expected_output = format!(
         "{}{1: <20} | {2: <20} | {3:.2}\n",
-        expected_output, "ripgrep", "BurntSushu", 0.88
+        expected_output, "ripgrep", "BurntSushi", 0.88
     );
 
     assert_eq!(String::from_utf8(output).unwrap(), expected_output);
