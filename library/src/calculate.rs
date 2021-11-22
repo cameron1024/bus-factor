@@ -100,6 +100,8 @@ fn is_bus_factor_1(repo: &RepositorySummary) -> bool {
 #[cfg(test)]
 mod tests {
 
+    use crate::prelude::Owner;
+
     use super::*;
 
     #[test]
@@ -151,7 +153,7 @@ mod tests {
         let mut output = vec![];
         format_results(&mut output, [summary]).unwrap();
         let s = String::from_utf8(output).unwrap();
-        assert_eq!(s.lines().collect::<Vec<_>>().len(), 2);  // 2 lines from header, rest should be empty
+        assert_eq!(s.lines().collect::<Vec<_>>().len(), 2); // 2 lines from header, rest should be empty
     }
 
     #[test]
@@ -169,7 +171,11 @@ mod tests {
         let mut both = vec![];
         let mut only_last = vec![];
 
-        format_results(&mut both, [ignored_summary.clone(), printed_sumamry.clone()]).unwrap();
+        format_results(
+            &mut both,
+            [ignored_summary.clone(), printed_sumamry.clone()],
+        )
+        .unwrap();
         format_results(&mut only_last, [printed_sumamry]).unwrap();
 
         assert_eq!(both, only_last);
@@ -205,5 +211,46 @@ mod tests {
     #[should_panic]
     fn should_panic_when_no_contributors() {
         summarize("".into(), make_contributors([]));
+    }
+
+    #[tokio::test]
+    async fn process_repo_summarizes_repo() {
+        let summary = process_repo(
+            MockClient,
+            Repository {
+                name: "repo_name".into(),
+                owner: Owner {
+                    login: "owner".into(),
+                },
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(summary, RepositorySummary {
+            repo_name: "repo_name".into(),
+            lead_contributor: "user3".into(),
+            percentage: 0.4,
+        });
+    }
+
+    #[derive(Clone)]
+    struct MockClient;
+
+    #[async_trait]
+    impl GithubClient for MockClient {
+        async fn list_repositories<Q: Into<Query> + Send>(
+            &self,
+            _query: Q,
+        ) -> Result<Vec<Repository>, Error> {
+            unimplemented!()
+        }
+
+        async fn list_contributors(
+            &self,
+            _repository: &Repository,
+        ) -> Result<Vec<Contributor>, Error> {
+            Ok(make_contributors([1, 2, 3, 4]))
+        }
     }
 }
